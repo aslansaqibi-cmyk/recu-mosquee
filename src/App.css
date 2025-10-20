@@ -1,0 +1,96 @@
+:root{
+  --bg:#f6f7f9;
+  --card:#ffffff;
+  --text:#111827;          /* texte noir/gris foncé */
+  --muted:#6b7280;         /* sous-texte */
+  --primary:#0d6efd;       /* bleu bouton */
+  --ring: rgba(13,110,253,.28);
+  --shadow: 0 10px 30px rgba(0,0,0,.08);
+  --radius:16px;
+}
+
+*{box-sizing:border-box}
+html,body,#root{height:100%}
+
+body{
+  margin:0;
+  color:var(--text);
+  background:var(--bg);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, Noto Sans, "Apple Color Emoji","Segoe UI Emoji";
+  color-scheme: light; /* évite les inversions auto en sombre */
+}
+
+.brandbar{
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  padding:16px; background:#fff; border-bottom:1px solid rgba(0,0,0,.06);
+  position:sticky; top:0; z-index:10; backdrop-filter:saturate(1.2) blur(6px);
+}
+.logo{
+  width:36px; height:36px; border-radius:9px;
+  display:grid; place-items:center; font-weight:800;
+  color:#0d6efd; background:#0d6efd10; border:1px solid #0d6efd22;
+}
+.brandtitle{ font-weight:800; letter-spacing:.2px }
+
+.wrapper{ min-height:calc(100vh - 70px); display:grid; place-items:center; padding:24px }
+
+.card{
+  width:min(100%, 520px);
+  background:var(--card);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:24px;
+  border:1px solid rgba(0,0,0,.06);
+}
+
+.header{ display:flex; align-items:center; justify-content:space-between; gap:12px }
+.title{ margin:0; font-size:22px; font-weight:800 }
+.subtitle{ margin:6px 0 0; color:var(--muted); font-size:13px }
+
+.form{ display:grid; gap:14px; margin-top:16px }
+.label{ font-size:13px; color:#374151; margin-bottom:6px; display:block }
+
+/* champs super lisibles */
+.input{
+  width:100%; padding:12px 14px; font-size:15px;
+  color:#111827; background:#fff;
+  border:1px solid #e5e7eb; border-radius:12px; outline:none;
+  transition:border-color .15s, box-shadow .15s, background .15s, color .15s;
+}
+.input::placeholder{ color:#9ca3af } /* placeholder gris lisible */
+.input:focus{ border-color:var(--primary); box-shadow:0 0 0 4px var(--ring) }
+
+/* corrige le texte invisible en auto-remplissage Safari/Chrome */
+.input:-webkit-autofill{
+  -webkit-text-fill-color:#111827 !important;
+  transition: background-color 9999s ease-out 0s;
+  box-shadow: 0 0 0px 1000px #fff inset !important;
+}
+
+.input::-webkit-outer-spin-button,
+.input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0 }
+
+.row{ display:grid; grid-template-columns:1fr 1fr; gap:12px }
+@media (max-width:480px){ .row{ grid-template-columns:1fr } }
+
+.actions{ display:grid; gap:10px; margin-top:6px }
+.btn{
+  width:100%; padding:12px 14px; border:none; border-radius:12px;
+  background:var(--primary); color:#fff; font-weight:800; letter-spacing:.2px;
+  cursor:pointer; transition:filter .2s, transform .06s;
+}
+.btn:hover{ filter:saturate(1.06) brightness(1.02) }
+.btn:active{ transform: translateY(1px) }
+.btn[disabled]{ cursor:not-allowed; background:#9aa4b2 }
+
+.spinner{
+  width:16px; height:16px; border-radius:50%;
+  border:2px solid #ffffff80; border-top-color:#fff; display:inline-block; vertical-align:-3px;
+  animation:spin .7s linear infinite; margin-right:8px;
+}
+@keyframes spin{ to{ transform:rotate(360deg)} }
+
+.note{
+  margin-top:14px; font-size:12px; color:#4b5563; background:#f8fafc;
+  border:1px dashed #e5e7eb; padding:10px 12px; border-radius:10px;
+}
