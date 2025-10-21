@@ -55,6 +55,9 @@ async function blobToBase64(blob) {
   for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
   return btoa(bin);
 }
+function paymentLabel(m){
+  return m === 'CB' ? 'Carte bancaire (CB)' : m === 'Virement' ? 'Virement' : 'Espèce';
+}
 
 const ASSOCIATION_NAME = "ASSOCIATION MIM";
 const ASSOCIATION_ADDRESS = "2 Place Victor Hugo, 95400 Villiers-le-Bel"; // adresse inchangée
@@ -215,7 +218,7 @@ export default function RootApp() {
   const [amount, setAmount] = useState("");
   const [email, setEmail] = useState("");
   const [donationDate, setDonationDate] = useState(() => new Date().toISOString().slice(0,10)); // yyyy-mm-dd
-  const [paymentMethod, setPaymentMethod] = useState("CB"); // "CB" | "Virement" | "Espece"
+  const [paymentMethod, setPaymentMethod] = useState("Espece"); // "Espece" | "CB" | "Virement"
   const [signerName, setSignerName] = useState(SIGNATURE_OPTIONS[0]);
   const [loading, setLoading] = useState(false);
 
@@ -272,8 +275,8 @@ export default function RootApp() {
     const emailTrim = email.trim();
     const signerTrim = signerName.trim();
 
-    if (!donorTrim || !amount || !emailTrim) return alert("Merci de remplir toutes les informations");
-    if (!isValidEmail(emailTrim)) return alert("Adresse e-mail invalide.");
+    if (!donorTrim || !amount) return alert("Merci de remplir le nom du donateur et le montant");
+    if (emailTrim && !isValidEmail(emailTrim)) return alert("Adresse e-mail invalide.");
     const amountNumber = Number(amount);
     if (isNaN(amountNumber) || amountNumber <= 0) return alert("Montant invalide.");
     if (!donationDate) return alert("Merci de choisir une date.");
@@ -290,12 +293,17 @@ export default function RootApp() {
 
       // PDF
       const pdf = new jsPDF();
+      // En-tête encadré (style courrier) + numéro en haut à droite
+      const pageW = pdf.internal.pageSize.getWidth();
       pdf.setFontSize(14);
-      pdf.text(ASSOCIATION_NAME, 20, 20);
-      pdf.text(ASSOCIATION_ADDRESS, 20, 30);
+      pdf.setDrawColor(0);
+      pdf.setLineWidth(0.5);
+      pdf.roundedRect(15, 15, pageW - 30, 22, 3, 3);
+      pdf.text(ASSOCIATION_NAME, 20, 26);
       pdf.setFontSize(12);
-      pdf.text(`Objet de l'association : ${ASSOCIATION_OBJECT}`, 20, 40);
-      pdf.text(`Reçu N°: ${number}`, 20, 55);
+      pdf.text(ASSOCIATION_ADDRESS, 20, 34);
+      pdf.text(`Objet de l'association : ${ASSOCIATION_OBJECT}`, 20, 46);
+      pdf.text(`Reçu N°: ${number}`, pageW - 20, 14, { align: 'right' });
       pdf.text(`Donateur : ${donorTrim}`, 20, 70);
       pdf.text(`Montant : ${amountNumber.toFixed(2)} €`, 20, 80);
       pdf.text(`Date du don : ${formatDateFR(donationDate)}`, 20, 90);
@@ -304,10 +312,9 @@ export default function RootApp() {
       pdf.text(splitPurpose, 20, 115);
       // Signature (mention à côté du nom)
       const signY = 135;
-      pdf.text(`Nom et qualité du signataire : ${signerTrim}`, 20, signY);
-      pdf.text("Signature :", 20, signY + 10);
-      pdf.line(45, signY + 10, 120, signY + 10);
-      pdf.text("Merci pour votre soutien.", 20, signY + 30);
+      pdf.text("Signature, nom et qualité du signataire :", 20, signY);
+      pdf.text(`${signerTrim}`, 20, signY + 8);
+      pdf.text("Merci pour votre soutien.", 20, signY + 26);
 
       const pdfBlob = pdf.output("blob");
       const fileName = `receipt_${number}.pdf`;
@@ -355,7 +362,7 @@ export default function RootApp() {
 
       // Mail avec PJ PDF
       await addDoc(collection(db, "mail"), {
-        to: [emailTrim, "aslan.saqibi@gmail.com"],
+        to: (emailTrim ? [emailTrim, "aslan.saqibi@gmail.com"] : ["aslan.saqibi@gmail.com"]),
         message: {
           subject: `Reçu ${ASSOCIATION_NAME} N°${number}`,
           text: `Cher ${donorTrim},\n\nMerci pour votre don de ${amountNumber.toFixed(2)} €.\nDate du don : ${formatDateFR(donationDate)}\nMode de paiement : ${paymentMethod === 'CB' ? 'Carte bancaire (CB)' : paymentMethod === 'Virement' ? 'Virement' : 'Espèce'}
@@ -427,9 +434,9 @@ export default function RootApp() {
               <div>
                 <label className="label" htmlFor="paymentMethod">Mode de paiement</label>
                 <select id="paymentMethod" className="input" value={paymentMethod} onChange={(e)=>setPaymentMethod(e.target.value)}>
+                  <option value="Espece">Espèce</option>
                   <option value="CB">Carte bancaire (CB)</option>
                   <option value="Virement">Virement</option>
-                  <option value="Espece">Espèce</option>
                 </select>
               </div>
             </div>
@@ -441,7 +448,6 @@ export default function RootApp() {
                   <option key={opt} value={opt}>{opt}</option>
                 ))}
               </select>
-              <div style={{fontSize:12, color:"#6b7280", marginTop:4}}>Connecté en tant que : {user?.email}</div>
               <div style={{fontSize:12, color:"#6b7280", marginTop:4}}>Connecté en tant que : {user?.email}</div>
             </div>
 
