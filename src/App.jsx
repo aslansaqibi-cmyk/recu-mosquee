@@ -56,6 +56,32 @@ async function blobToBase64(blob) {
   return btoa(bin);
 }
 
+const ASSOCIATION_NAME = "ASSOCIATION MIM";
+const ASSOCIATION_ADDRESS = "2 Place Victor Hugo, 95400 Villiers-le-Bel"; // adresse inchangée
+const ASSOCIATION_OBJECT = "Religion"; // objet de l'association
+const DON_PURPOSE = "UTILISATION PRÉVUE DU DON : CONSTRUCTION DE MOSQUÉE POUR L'ASSOCIATION MIM.";
+const SIGNATURE_OPTIONS = [
+  "TRÉSORIER : RAJA TARIQ",
+  "PRÉSIDENT : ALI ASIF",
+];
+
+function deriveNameFromEmail(email) {
+  if (!email) return "";
+  const local = email.split("@")[0];
+  // Remplace séparateurs courants par des espaces et met en Capitalize simple
+  const pretty = local.replace(/[._-]+/g, " ").trim();
+  return pretty.replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+function formatDateFR(dateStr) {
+  try {
+    const d = new Date(`${dateStr}T00:00:00`);
+    return d.toLocaleDateString("fr-FR");
+  } catch {
+    return dateStr;
+  }
+}
+
 function AuthCard({ onReady }) {
   const [mode, setMode] = useState("signin"); // 'signin' | 'signup' | 'reset'
   const [email, setEmail] = useState("");
@@ -110,8 +136,8 @@ function AuthCard({ onReady }) {
   return (
     <>
       <div className="brandbar">
-        <div className="logo">Q</div>
-        <div className="brandtitle">Mosquée Quba — Accès sécurisé</div>
+        <div className="logo">M</div>
+        <div className="brandtitle">{ASSOCIATION_NAME} — Accès sécurisé</div>
       </div>
 
       <div className="wrapper">
@@ -188,6 +214,9 @@ export default function RootApp() {
   const [donor, setDonor] = useState("");
   const [amount, setAmount] = useState("");
   const [email, setEmail] = useState("");
+  const [donationDate, setDonationDate] = useState(() => new Date().toISOString().slice(0,10)); // yyyy-mm-dd
+  const [paymentMethod, setPaymentMethod] = useState("CB"); // "CB" | "Virement" | "Espece"
+  const [signerName, setSignerName] = useState(SIGNATURE_OPTIONS[0]);
   const [loading, setLoading] = useState(false);
 
   // Session
@@ -195,7 +224,6 @@ export default function RootApp() {
     return onAuthStateChanged(auth, async (u) => {
       setUser(u || null);
       if (u) {
-        // Vérifie si l'UID est dans admins
         try {
           const snap = await getDoc(doc(db, "admins", u.uid));
           setIsAdmin(snap.exists());
@@ -222,8 +250,8 @@ export default function RootApp() {
     return (
       <>
         <div className="brandbar">
-          <div className="logo">Q</div>
-          <div className="brandtitle">Mosquée Quba — Accès sécurisé</div>
+          <div className="logo">M</div>
+          <div className="brandtitle">{ASSOCIATION_NAME} — Accès sécurisé</div>
         </div>
         <div className="wrapper">
           <div className="card">
@@ -242,11 +270,13 @@ export default function RootApp() {
   const generateReceipt = async () => {
     const donorTrim = donor.trim();
     const emailTrim = email.trim();
+    const signerTrim = signerName.trim();
 
     if (!donorTrim || !amount || !emailTrim) return alert("Merci de remplir toutes les informations");
     if (!isValidEmail(emailTrim)) return alert("Adresse e-mail invalide.");
     const amountNumber = Number(amount);
     if (isNaN(amountNumber) || amountNumber <= 0) return alert("Montant invalide.");
+    if (!donationDate) return alert("Merci de choisir une date.");
 
     setLoading(true);
     try {
@@ -258,21 +288,29 @@ export default function RootApp() {
         const next = (snap.data().value || 0) + 1; tx.update(counterRef, { value: next }); return next;
       });
 
- // PDF
-const pdf = new jsPDF();
-pdf.setFontSize(14);
-pdf.text("Mosquée Quba", 20, 20);
-pdf.text("2 Place Victor Hugo, 95400 Villiers-le-Bel", 20, 30);
-pdf.text(`Reçu N°: ${number}`, 20, 50);
-pdf.text(`Donateur : ${donorTrim}`, 20, 70);
-pdf.text(`Montant : ${amountNumber.toFixed(2)} €`, 20, 80);
-pdf.text(`Date : ${new Date().toLocaleDateString()}`, 20, 90);
-pdf.text("Merci pour votre soutien.", 20, 110);
+      // PDF
+      const pdf = new jsPDF();
+      pdf.setFontSize(14);
+      pdf.text(ASSOCIATION_NAME, 20, 20);
+      pdf.text(ASSOCIATION_ADDRESS, 20, 30);
+      pdf.setFontSize(12);
+      pdf.text(`Objet de l'association : ${ASSOCIATION_OBJECT}`, 20, 40);
+      pdf.text(`Reçu N°: ${number}`, 20, 55);
+      pdf.text(`Donateur : ${donorTrim}`, 20, 70);
+      pdf.text(`Montant : ${amountNumber.toFixed(2)} €`, 20, 80);
+      pdf.text(`Date du don : ${formatDateFR(donationDate)}`, 20, 90);
+      pdf.text(`Mode de paiement : ${paymentMethod === 'CB' ? 'Carte bancaire (CB)' : paymentMethod === 'Virement' ? 'Virement' : 'Espèce'}`, 20, 100);
+      const splitPurpose = pdf.splitTextToSize(DON_PURPOSE, 170);
+      pdf.text(splitPurpose, 20, 115);
+      // Signature (mention à côté du nom)
+      const signY = 135;
+      pdf.text(`Nom et qualité du signataire : ${signerTrim}`, 20, signY);
+      pdf.text("Signature :", 20, signY + 10);
+      pdf.line(45, signY + 10, 120, signY + 10);
+      pdf.text("Merci pour votre soutien.", 20, signY + 30);
 
-const pdfBlob = pdf.output("blob");
-const fileName = `receipt_${number}.pdf`;
-
-
+      const pdfBlob = pdf.output("blob");
+      const fileName = `receipt_${number}.pdf`;
 
       // Téléchargement local
       try { pdf.save(fileName); }
@@ -294,9 +332,20 @@ const fileName = `receipt_${number}.pdf`;
       // Sauvegarde Firestore
       try {
         await setDoc(doc(db, "receipts", `receipt_${number}`), {
-          donor: donorTrim, amount: amountNumber, email: emailTrim,
-          number, date: new Date().toISOString(), createdAt: serverTimestamp(),
-          fileUrl: fileUrl || null, uid: user.uid,
+          association: ASSOCIATION_NAME,
+          address: ASSOCIATION_ADDRESS,
+          associationObject: ASSOCIATION_OBJECT,
+          donor: donorTrim,
+          amount: amountNumber,
+          email: emailTrim,
+          number,
+          donationDate,
+          paymentMethod,
+          purpose: DON_PURPOSE,
+          signerName: signerTrim,
+          signerUid: user.uid,
+          createdAt: serverTimestamp(),
+          fileUrl: fileUrl || null,
         });
       } catch (e) { console.error("Erreur enregistrement reçu:", e); }
 
@@ -308,19 +357,18 @@ const fileName = `receipt_${number}.pdf`;
       await addDoc(collection(db, "mail"), {
         to: [emailTrim, "aslan.saqibi@gmail.com"],
         message: {
-          subject: `Reçu Mosquée Quba N°${number}`,
-          text: `Cher ${donorTrim},
-
-Merci pour votre don de ${amountNumber.toFixed(2)} €.
-
-Veuillez trouver votre reçu en pièce jointe.
-
-Mosquée Quba`,
+          subject: `Reçu ${ASSOCIATION_NAME} N°${number}`,
+          text: `Cher ${donorTrim},\n\nMerci pour votre don de ${amountNumber.toFixed(2)} €.\nDate du don : ${formatDateFR(donationDate)}\nMode de paiement : ${paymentMethod === 'CB' ? 'Carte bancaire (CB)' : paymentMethod === 'Virement' ? 'Virement' : 'Espèce'}
+\n${DON_PURPOSE}\n\nVeuillez trouver votre reçu en pièce jointe.\n\n${ASSOCIATION_NAME} — ${ASSOCIATION_ADDRESS}`,
           html: `
             <p>Cher ${donorTrim},</p>
             <p>Merci pour votre don de <strong>${amountNumber.toFixed(2)} €</strong>.</p>
+            <p><strong>Date du don :</strong> ${formatDateFR(donationDate)}<br/>
+               <strong>Mode de paiement :</strong> ${paymentLabel(paymentMethod)}<br/>
+               <strong>Signataire :</strong> ${signerTrim}</p>
+            <p>${DON_PURPOSE}</p>
             <p>Veuillez trouver votre reçu en pièce jointe.</p>
-            <p>Mosquée Quba</p>
+            <p>${ASSOCIATION_NAME} — ${ASSOCIATION_ADDRESS}</p>
           `,
           attachments: [
             { filename: fileName, content: pdfBase64, encoding: "base64", contentType: "application/pdf" },
@@ -329,6 +377,7 @@ Mosquée Quba`,
       });
 
       setDonor(""); setAmount(""); setEmail("");
+      // Ne pas réinitialiser la date ni la méthode de paiement pour gains de temps
       alert("✅ Reçu généré et envoyé avec la pièce jointe PDF.");
     } catch (e) {
       console.error("Erreur:", e);
@@ -339,8 +388,8 @@ Mosquée Quba`,
   return (
     <>
       <div className="brandbar">
-        <div className="logo">Q</div>
-        <div className="brandtitle">Mosquée Quba — Reçus de dons (admin)</div>
+        <div className="logo">M</div>
+        <div className="brandtitle">{ASSOCIATION_NAME} — Reçus de dons (admin)</div>
       </div>
 
       <div className="wrapper">
@@ -349,7 +398,9 @@ Mosquée Quba`,
             <h1 className="title">Générer un reçu PDF</h1>
             <button className="btn" onClick={logout} style={{width:"auto", padding:"8px 12px"}}>Se déconnecter</button>
           </div>
-          <p className="subtitle">Remplissez les informations puis cliquez sur “Générer le reçu”.</p>
+          <p className="subtitle">
+            Adresse : {ASSOCIATION_ADDRESS} • Objet de l'association : {ASSOCIATION_OBJECT}
+          </p>
 
           <div className="form">
             <div>
@@ -366,6 +417,36 @@ Mosquée Quba`,
                 <label className="label" htmlFor="email">Email du donateur</label>
                 <input id="email" className="input" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="ex. jean@mail.com" />
               </div>
+            </div>
+
+            <div className="row">
+              <div>
+                <label className="label" htmlFor="donationDate">Date du don</label>
+                <input id="donationDate" className="input" type="date" value={donationDate} onChange={(e)=>setDonationDate(e.target.value)} />
+              </div>
+              <div>
+                <label className="label" htmlFor="paymentMethod">Mode de paiement</label>
+                <select id="paymentMethod" className="input" value={paymentMethod} onChange={(e)=>setPaymentMethod(e.target.value)}>
+                  <option value="CB">Carte bancaire (CB)</option>
+                  <option value="Virement">Virement</option>
+                  <option value="Espece">Espèce</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="label" htmlFor="signer">Signature (choisir une option)</label>
+              <select id="signer" className="input" value={signerName} onChange={(e)=>setSignerName(e.target.value)}>
+                {SIGNATURE_OPTIONS.map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+              <div style={{fontSize:12, color:"#6b7280", marginTop:4}}>Connecté en tant que : {user?.email}</div>
+              <div style={{fontSize:12, color:"#6b7280", marginTop:4}}>Connecté en tant que : {user?.email}</div>
+            </div>
+
+            <div className="note" style={{marginTop:8}}>
+              {DON_PURPOSE}
             </div>
 
             <div className="actions">
