@@ -258,19 +258,94 @@ export default function RootApp() {
         const next = (snap.data().value || 0) + 1; tx.update(counterRef, { value: next }); return next;
       });
 
-      // PDF
-      const pdf = new jsPDF();
-      pdf.setFontSize(14);
-      pdf.text("Mosquée Quba", 20, 20);
-      pdf.text("2 Place Victor Hugo, 95400 Villiers-le-Bel", 20, 30);
-      pdf.text(`Reçu N°: ${number}`, 20, 50);
-      pdf.text(`Donateur : ${donorTrim}`, 20, 70);
-      pdf.text(`Montant : ${amountNumber.toFixed(2)} €`, 20, 80);
-      pdf.text(`Date : ${new Date().toLocaleDateString()}`, 20, 90);
-      pdf.text("Merci pour votre soutien.", 20, 110);
+  // PDF (mise en page améliorée jsPDF pur)
+const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
+const pageW = pdf.internal.pageSize.getWidth();
+const margin = 18;
+const now = new Date();
+const frDate = now.toLocaleDateString("fr-FR", { year: "numeric", month: "2-digit", day: "2-digit" });
 
-      const pdfBlob = pdf.output("blob");
-      const fileName = `receipt_${number}.pdf`;
+// Helpers
+const fmtAmount = (n) =>
+  new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(n);
+const pad = (n) => String(n).padStart(5, "0");
+
+// En-tête
+pdf.setFont("helvetica", "bold");
+pdf.setFontSize(12);
+pdf.text("Association cultuelle – Mosquée Quba", margin, 16);
+pdf.setFont("helvetica", "normal");
+pdf.setFontSize(10);
+pdf.text("2 Place Victor Hugo, 95400 Villiers-le-Bel", margin, 22);
+
+// Titre
+pdf.setDrawColor(0);
+pdf.setLineWidth(0.6);
+pdf.line(margin, 28, pageW - margin, 28);
+pdf.setFont("helvetica", "bold");
+pdf.setFontSize(18);
+pdf.text("REÇU DE DON", pageW / 2, 40, { align: "center" });
+
+// Cadre infos principales
+const boxTop = 48;
+const boxH = 30;
+pdf.setLineWidth(0.3);
+pdf.rect(margin, boxTop, pageW - margin * 2, boxH);
+
+pdf.setFont("helvetica", "bold");
+pdf.setFontSize(11);
+pdf.text("Reçu N° :", margin + 6, boxTop + 10);
+pdf.text("Date :", margin + 6, boxTop + 20);
+
+pdf.setFont("helvetica", "normal");
+pdf.text(pad(number), margin + 40, boxTop + 10);
+pdf.text(frDate, margin + 40, boxTop + 20);
+
+// Donateur & Montant
+const infoTop = boxTop + boxH + 12;
+pdf.setFont("helvetica", "bold");
+pdf.setFontSize(11);
+pdf.text("Donateur :", margin, infoTop);
+pdf.text("Montant :", margin, infoTop + 10);
+
+pdf.setFont("helvetica", "normal");
+pdf.setFontSize(11);
+pdf.text(donorTrim, margin + 28, infoTop);
+pdf.text(fmtAmount(amountNumber), margin + 28, infoTop + 10);
+
+// Message / mentions
+const msgTop = infoTop + 24;
+pdf.setFont("helvetica", "normal");
+pdf.setFontSize(10);
+pdf.text(
+  "Merci pour votre soutien. Ce reçu atteste la perception du don mentionné ci-dessus.",
+  margin,
+  msgTop
+);
+
+// Signature (optionnelle)
+const sigTop = msgTop + 20;
+pdf.setFont("helvetica", "bold");
+pdf.text("Signature / Cachet :", margin, sigTop);
+pdf.setLineWidth(0.2);
+pdf.rect(margin, sigTop + 4, pageW - margin * 2, 22);
+
+// Pied de page
+const footerY = 287;
+pdf.setFont("helvetica", "normal");
+pdf.setFontSize(8);
+pdf.text(
+  `Document généré automatiquement le ${frDate} – Reçu N° ${pad(number)}`,
+  pageW / 2,
+  footerY,
+  { align: "center" }
+);
+
+// Sortie blob + nommage fichier
+const fileName = `recu_quba_${pad(number)}_${now.toISOString().slice(0,10)}.pdf`;
+const pdfBlob = pdf.output("blob");
+try { pdf.save(fileName); } catch {/* fallback géré plus bas */}
+
 
       // Téléchargement local
       try { pdf.save(fileName); }
