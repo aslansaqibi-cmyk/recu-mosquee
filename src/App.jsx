@@ -398,22 +398,36 @@ export default function RootApp() {
         bcc: [MAIL_ARCHIVE_BCC],        // ta copie cachée
         from: MAIL_FROM,                // nécessite config côté extension/SMTP
         replyTo: MAIL_REPLY_TO,         // où les gens répondent
-        message: {
-          subject: `Reçu ${ASSOCIATION_NAME} N°${number}`,
-          text: `Cher ${donorTrim},\n\nMerci pour votre don de ${amountNumber.toFixed(2)} €.\nDate du don : ${formatDateFR(donationDate)}\nMode de paiement : ${paymentLabel(paymentMethod)}\nSignataire : ${signerTrim}\n\n${DON_PURPOSE}\n\nVeuillez trouver votre reçu en pièce jointe.\n\n${ASSOCIATION_NAME} — ${ASSOCIATION_ADDRESS}`,
-          html: `
-            <p>Cher ${donorTrim},</p>
-            <p>Merci pour votre don de <strong>${amountNumber.toFixed(2)} €</strong>.</p>
-            <p><strong>Date du don :</strong> ${formatDateFR(donationDate)}<br/>
-               <strong>Mode de paiement :</strong> ${paymentLabel(paymentMethod)}<br/>
-               <strong>Signataire :</strong> ${signerTrim}</p>
-            <p>${DON_PURPOSE}</p>
-            <p>Veuillez trouver votre reçu en pièce jointe.</p>
-            <p>${ASSOCIATION_NAME} — ${ASSOCIATION_ADDRESS}</p>
-          `,
-          attachments: [
-            { filename: fileName, content: pdfBase64, encoding: "base64", contentType: "application/pdf" },
-          ],
+       message: {
+  subject: `Reçu ${ASSOCIATION_NAME} N°${number}`,
+
+  // --- Version texte brut ---
+  text: `As-salāmu ‘alaykum wa rahmatullāh,
+
+Qu’Allāh accepte votre don et vous récompense pour votre générosité.
+Veuillez trouver en pièce jointe le reçu correspondant à votre contribution.
+
+BarakAllāhu fīkum,
+L’équipe de l’Association MIM`,
+
+  // --- Version HTML ---
+  html: `
+    <p><strong>As-salāmu ‘alaykum wa rahmatullāh,</strong></p>
+    <p>Qu’Allāh accepte votre don et vous récompense pour votre générosité.</p>
+    <p>Veuillez trouver en pièce jointe le reçu correspondant à votre contribution.</p>
+    <p><em>BarakAllāhu fīkum,</em><br/>
+    L’équipe de l’Association MIM</p>
+  `,
+},
+
+attachments: [
+  {
+    filename: fileName,
+    content: pdfBase64,
+    type: "application/pdf",
+  },
+],
+
         },
       });
 
