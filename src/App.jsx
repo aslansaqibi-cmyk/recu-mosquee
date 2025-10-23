@@ -523,3 +523,4 @@ L’équipe de l’Association MIM`,
     </>
   );
 }
+
