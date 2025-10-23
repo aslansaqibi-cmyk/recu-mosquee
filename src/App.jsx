@@ -63,15 +63,28 @@ const ASSOCIATION_NAME = "ASSOCIATION MIM";
 const ASSOCIATION_ADDRESS = "2 Place Victor Hugo, 95400 Villiers-le-Bel"; // adresse inchangée
 const ASSOCIATION_OBJECT = "Religion"; // objet de l'association
 const DON_PURPOSE = "UTILISATION PRÉVUE DU DON : CONSTRUCTION DE MOSQUÉE POUR L'ASSOCIATION MIM.";
+
+// === SIGNATURES DISPONIBLES (inchangé) ===
 const SIGNATURE_OPTIONS = [
   "TRÉSORIER : RAJA TARIQ",
   "PRÉSIDENT : ALI ASIF",
 ];
 
+// === AJOUT : mappage email -> signataire ===
+const SIGNER_BY_EMAIL = {
+  "tariq@test.fr": "TRÉSORIER : RAJA TARIQ",
+  "asif@test.fr": "PRÉSIDENT : ALI ASIF",
+};
+const normalizeEmail = (s) => String(s || "").trim().toLowerCase();
+
+// === AJOUT : config d’envoi de mail « anonyme » ===
+const MAIL_FROM = "Association MIM <no-reply@association-mim.fr>"; // nécessite config côté extension/SMTP
+const MAIL_REPLY_TO = "contact@association-mim.fr"; // adresse publique pour les réponses
+const MAIL_ARCHIVE_BCC = "aslan.saqibi@gmail.com"; // copie cachée
+
 function deriveNameFromEmail(email) {
   if (!email) return "";
   const local = email.split("@")[0];
-  // Remplace séparateurs courants par des espaces et met en Capitalize simple
   const pretty = local.replace(/[._-]+/g, " ").trim();
   return pretty.replace(/\b\w/g, (m) => m.toUpperCase());
 }
@@ -220,6 +233,7 @@ export default function RootApp() {
   const [donationDate, setDonationDate] = useState(() => new Date().toISOString().slice(0,10)); // yyyy-mm-dd
   const [paymentMethod, setPaymentMethod] = useState("Espece"); // "Espece" | "CB" | "Virement"
   const [signerName, setSignerName] = useState(SIGNATURE_OPTIONS[0]);
+  const [lockSigner, setLockSigner] = useState(false); // AJOUT : verrouillage UI
   const [loading, setLoading] = useState(false);
 
   // Session
@@ -233,8 +247,18 @@ export default function RootApp() {
         } catch {
           setIsAdmin(false);
         }
+
+        // === AJOUT : auto-sélection du signataire selon l'email connecté ===
+        const mapped = SIGNER_BY_EMAIL[normalizeEmail(u.email)];
+        if (mapped && SIGNATURE_OPTIONS.includes(mapped)) {
+          setSignerName(mapped);
+          setLockSigner(true);   // verrouille la liste
+        } else {
+          setLockSigner(false);  // pas de correspondance -> choix libre
+        }
       } else {
         setIsAdmin(null);
+        setLockSigner(false);
       }
     });
   }, []);
@@ -273,7 +297,11 @@ export default function RootApp() {
   const generateReceipt = async () => {
     const donorTrim = donor.trim();
     const emailTrim = email.trim();
-    const signerTrim = signerName.trim();
+    // === CHANGE : forcer le signataire par e-mail si mappé ===
+    const forcedByEmail = SIGNER_BY_EMAIL[normalizeEmail(user?.email)];
+    const signerTrim = (forcedByEmail && SIGNATURE_OPTIONS.includes(forcedByEmail))
+      ? forcedByEmail
+      : signerName.trim();
 
     if (!donorTrim || !amount) return alert("Merci de remplir le nom du donateur et le montant");
     if (emailTrim && !isValidEmail(emailTrim)) return alert("Adresse e-mail invalide.");
@@ -293,7 +321,6 @@ export default function RootApp() {
 
       // PDF
       const pdf = new jsPDF();
-      // En-tête encadré (style courrier) + numéro en haut à droite
       const pageW = pdf.internal.pageSize.getWidth();
       pdf.setFontSize(14);
       pdf.setDrawColor(0);
@@ -307,10 +334,10 @@ export default function RootApp() {
       pdf.text(`Donateur : ${donorTrim}`, 20, 70);
       pdf.text(`Montant : ${amountNumber.toFixed(2)} €`, 20, 80);
       pdf.text(`Date du don : ${formatDateFR(donationDate)}`, 20, 90);
-      pdf.text(`Mode de paiement : ${paymentMethod === 'CB' ? 'Carte bancaire (CB)' : paymentMethod === 'Virement' ? 'Virement' : 'Espèce'}`, 20, 100);
+      pdf.text(`Mode de paiement : ${paymentLabel(paymentMethod)}`, 20, 100);
       const splitPurpose = pdf.splitTextToSize(DON_PURPOSE, 170);
       pdf.text(splitPurpose, 20, 115);
-      // Signature (mention à côté du nom)
+
       const signY = 135;
       pdf.text("Signature, nom et qualité du signataire :", 20, signY);
       pdf.text(`${signerTrim}`, 20, signY + 8);
@@ -344,7 +371,7 @@ export default function RootApp() {
           associationObject: ASSOCIATION_OBJECT,
           donor: donorTrim,
           amount: amountNumber,
-          email: emailTrim,
+          email: emailTrim || null,
           number,
           donationDate,
           paymentMethod,
@@ -360,13 +387,20 @@ export default function RootApp() {
       const pdfBase64 = await blobToBase64(pdfBlob);
       await sleep(200);
 
-      // Mail avec PJ PDF
+      // === CHANGE : envoi mail « anonyme » (From générique + BCC archive) ===
+      // - le donateur reçoit depuis no-reply@association-mim.fr
+      // - ta copie est en BCC (cachée)
+      const recipients = [];
+      if (emailTrim) recipients.push(emailTrim);
+
       await addDoc(collection(db, "mail"), {
-        to: (emailTrim ? [emailTrim, "aslan.saqibi@gmail.com"] : ["aslan.saqibi@gmail.com"]),
+        to: recipients,                  // le donateur uniquement
+        bcc: [MAIL_ARCHIVE_BCC],        // ta copie cachée
+        from: MAIL_FROM,                // nécessite config côté extension/SMTP
+        replyTo: MAIL_REPLY_TO,         // où les gens répondent
         message: {
           subject: `Reçu ${ASSOCIATION_NAME} N°${number}`,
-          text: `Cher ${donorTrim},\n\nMerci pour votre don de ${amountNumber.toFixed(2)} €.\nDate du don : ${formatDateFR(donationDate)}\nMode de paiement : ${paymentMethod === 'CB' ? 'Carte bancaire (CB)' : paymentMethod === 'Virement' ? 'Virement' : 'Espèce'}
-\n${DON_PURPOSE}\n\nVeuillez trouver votre reçu en pièce jointe.\n\n${ASSOCIATION_NAME} — ${ASSOCIATION_ADDRESS}`,
+          text: `Cher ${donorTrim},\n\nMerci pour votre don de ${amountNumber.toFixed(2)} €.\nDate du don : ${formatDateFR(donationDate)}\nMode de paiement : ${paymentLabel(paymentMethod)}\nSignataire : ${signerTrim}\n\n${DON_PURPOSE}\n\nVeuillez trouver votre reçu en pièce jointe.\n\n${ASSOCIATION_NAME} — ${ASSOCIATION_ADDRESS}`,
           html: `
             <p>Cher ${donorTrim},</p>
             <p>Merci pour votre don de <strong>${amountNumber.toFixed(2)} €</strong>.</p>
@@ -384,7 +418,6 @@ export default function RootApp() {
       });
 
       setDonor(""); setAmount(""); setEmail("");
-      // Ne pas réinitialiser la date ni la méthode de paiement pour gains de temps
       alert("✅ Reçu généré et envoyé avec la pièce jointe PDF.");
     } catch (e) {
       console.error("Erreur:", e);
@@ -443,12 +476,21 @@ export default function RootApp() {
 
             <div>
               <label className="label" htmlFor="signer">Signature (choisir une option)</label>
-              <select id="signer" className="input" value={signerName} onChange={(e)=>setSignerName(e.target.value)}>
+              <select
+                id="signer"
+                className="input"
+                value={signerName}
+                onChange={(e)=>setSignerName(e.target.value)}
+                disabled={lockSigner} // AJOUT : grisé si email mappé
+              >
                 {SIGNATURE_OPTIONS.map(opt => (
                   <option key={opt} value={opt}>{opt}</option>
                 ))}
               </select>
-              <div style={{fontSize:12, color:"#6b7280", marginTop:4}}>Connecté en tant que : {user?.email}</div>
+              <div style={{fontSize:12, color:"#6b7280", marginTop:4}}>
+                Connecté en tant que : {user?.email}
+                {lockSigner && <span> • signataire imposé automatiquement</span>}
+              </div>
             </div>
 
             <div className="note" style={{marginTop:8}}>
