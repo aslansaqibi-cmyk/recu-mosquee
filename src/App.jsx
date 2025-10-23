@@ -43,7 +43,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app, "gs://quba-21daf.firebasestorage.app");
 
-// ---------- HELPERS ----------
+// Helpers
 const isValidEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s || "").trim());
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const waitForUploadTask = (task) =>
@@ -58,26 +58,32 @@ async function blobToBase64(blob) {
   return btoa(bin);
 }
 function paymentLabel(m) {
-  return m === "CB" ? "Carte bancaire (CB)" : m === "Virement" ? "Virement" : "Espèce";
+  return m === "CB"
+    ? "Carte bancaire (CB)"
+    : m === "Virement"
+    ? "Virement"
+    : "Espèce";
 }
 
-// ---------- INFOS ASSOCIATION ----------
 const ASSOCIATION_NAME = "ASSOCIATION MIM";
 const ASSOCIATION_ADDRESS = "2 Place Victor Hugo, 95400 Villiers-le-Bel";
 const ASSOCIATION_OBJECT = "Religion";
 const DON_PURPOSE =
   "UTILISATION PRÉVUE DU DON : CONSTRUCTION DE MOSQUÉE POUR L'ASSOCIATION MIM.";
 
-// ---------- SIGNATURES ----------
-const SIGNATURE_OPTIONS = ["TRÉSORIER : RAJA TARIQ", "PRÉSIDENT : ALI ASIF"];
+const SIGNATURE_OPTIONS = [
+  "TRÉSORIER : RAJA TARIQ",
+  "PRÉSIDENT : ALI ASIF",
+];
 
+// correspondance email → signataire
 const SIGNER_BY_EMAIL = {
   "tariq@test.fr": "TRÉSORIER : RAJA TARIQ",
   "asif@test.fr": "PRÉSIDENT : ALI ASIF",
 };
 const normalizeEmail = (s) => String(s || "").trim().toLowerCase();
 
-// ---------- CONFIG MAIL ----------
+// configuration de l'envoi d'emails anonymes
 const MAIL_FROM = "Association MIM <no.reply.masjidquba@gmail.com>";
 const MAIL_REPLY_TO = "no.reply.masjidquba@gmail.com";
 const MAIL_ARCHIVE_BCC = "no.reply.masjidquba@gmail.com";
@@ -91,17 +97,29 @@ function formatDateFR(dateStr) {
   }
 }
 
-// ---------- AUTH COMPONENT ----------
 function AuthCard({ onReady }) {
   const [mode, setMode] = useState("signin");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [loading, setLoading] = useState(false);
-
   const canSubmit = useMemo(
     () => isValidEmail(email) && (mode === "reset" ? true : pw.length >= 6),
     [email, pw, mode]
   );
+
+  const handleSignup = async () => {
+    if (!canSubmit) return;
+    setLoading(true);
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email.trim(), pw);
+      alert("✅ Compte créé. Demande à l’admin d’ajouter ton UID dans 'admins'.");
+      onReady?.(cred.user);
+    } catch (e) {
+      alert(`❌ Inscription: ${e.message || e}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSignin = async () => {
     if (!canSubmit) return;
@@ -110,21 +128,7 @@ function AuthCard({ onReady }) {
       const cred = await signInWithEmailAndPassword(auth, email.trim(), pw);
       onReady?.(cred.user);
     } catch (e) {
-      alert(`❌ Connexion: ${e.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignup = async () => {
-    if (!canSubmit) return;
-    setLoading(true);
-    try {
-      const cred = await createUserWithEmailAndPassword(auth, email.trim(), pw);
-      alert("✅ Compte créé !");
-      onReady?.(cred.user);
-    } catch (e) {
-      alert(`❌ Inscription: ${e.message}`);
+      alert(`❌ Connexion: ${e.message || e}`);
     } finally {
       setLoading(false);
     }
@@ -138,7 +142,7 @@ function AuthCard({ onReady }) {
       alert("📩 Email de réinitialisation envoyé.");
       setMode("signin");
     } catch (e) {
-      alert(`❌ Reset: ${e.message}`);
+      alert(`❌ Reset: ${e.message || e}`);
     } finally {
       setLoading(false);
     }
@@ -148,9 +152,10 @@ function AuthCard({ onReady }) {
     <>
       <div className="brandbar">
         <div className="logo">M</div>
-        <div className="brandtitle">{ASSOCIATION_NAME} — Accès sécurisé</div>
+        <div className="brandtitle">
+          {ASSOCIATION_NAME} — Accès sécurisé
+        </div>
       </div>
-
       <div className="wrapper">
         <div className="card">
           <div className="header">
@@ -162,39 +167,80 @@ function AuthCard({ onReady }) {
                 : "Mot de passe oublié"}
             </h1>
           </div>
+          <p className="subtitle">
+            {mode === "reset"
+              ? "Entrez votre e-mail pour réinitialiser votre mot de passe."
+              : "Accès réservé aux responsables autorisés."}
+          </p>
           <div className="form">
-            <label>Email</label>
-            <input type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <div>
+              <label className="label">Email</label>
+              <input
+                type="email"
+                className="input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
             {mode !== "reset" && (
-              <>
-                <label>Mot de passe</label>
-                <input type="password" className="input" value={pw} onChange={(e) => setPw(e.target.value)} />
-              </>
+              <div>
+                <label className="label">Mot de passe</label>
+                <input
+                  type="password"
+                  className="input"
+                  value={pw}
+                  onChange={(e) => setPw(e.target.value)}
+                />
+              </div>
             )}
             <div className="actions">
               {mode === "signin" && (
                 <>
-                  <button disabled={!canSubmit || loading} onClick={handleSignin}>
+                  <button
+                    className="btn"
+                    disabled={!canSubmit || loading}
+                    onClick={handleSignin}
+                  >
                     {loading ? "Connexion…" : "Se connecter"}
                   </button>
-                  <span onClick={() => setMode("signup")}>Créer un compte</span>
-                  <span onClick={() => setMode("reset")}>Mot de passe oublié</span>
+                  <div className="smalltext">
+                    <span onClick={() => setMode("signup")}>Créer un compte</span> •{" "}
+                    <span onClick={() => setMode("reset")}>Mot de passe oublié</span>
+                  </div>
                 </>
               )}
               {mode === "signup" && (
                 <>
-                  <button disabled={!canSubmit || loading} onClick={handleSignup}>
+                  <button
+                    className="btn"
+                    disabled={!canSubmit || loading}
+                    onClick={handleSignup}
+                  >
                     {loading ? "Création…" : "Créer le compte"}
                   </button>
-                  <span onClick={() => setMode("signin")}>Retour</span>
+                  <div
+                    className="smalltext"
+                    onClick={() => setMode("signin")}
+                  >
+                    ← Retour
+                  </div>
                 </>
               )}
               {mode === "reset" && (
                 <>
-                  <button disabled={!isValidEmail(email) || loading} onClick={handleReset}>
+                  <button
+                    className="btn"
+                    disabled={!isValidEmail(email) || loading}
+                    onClick={handleReset}
+                  >
                     {loading ? "Envoi…" : "Envoyer le lien"}
                   </button>
-                  <span onClick={() => setMode("signin")}>Retour</span>
+                  <div
+                    className="smalltext"
+                    onClick={() => setMode("signin")}
+                  >
+                    ← Retour
+                  </div>
                 </>
               )}
             </div>
@@ -205,14 +251,15 @@ function AuthCard({ onReady }) {
   );
 }
 
-// ---------- MAIN APP ----------
 export default function RootApp() {
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(null);
   const [donor, setDonor] = useState("");
   const [amount, setAmount] = useState("");
   const [email, setEmail] = useState("");
-  const [donationDate, setDonationDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [donationDate, setDonationDate] = useState(() =>
+    new Date().toISOString().slice(0, 10)
+  );
   const [paymentMethod, setPaymentMethod] = useState("Espece");
   const [signerName, setSignerName] = useState(SIGNATURE_OPTIONS[0]);
   const [lockSigner, setLockSigner] = useState(false);
@@ -228,14 +275,11 @@ export default function RootApp() {
         } catch {
           setIsAdmin(false);
         }
-
         const mapped = SIGNER_BY_EMAIL[normalizeEmail(u.email)];
         if (mapped && SIGNATURE_OPTIONS.includes(mapped)) {
           setSignerName(mapped);
           setLockSigner(true);
-        } else {
-          setLockSigner(false);
-        }
+        } else setLockSigner(false);
       } else {
         setIsAdmin(null);
         setLockSigner(false);
@@ -258,12 +302,14 @@ export default function RootApp() {
       <>
         <div className="brandbar">
           <div className="logo">M</div>
-          <div className="brandtitle">{ASSOCIATION_NAME}</div>
+          <div className="brandtitle">{ASSOCIATION_NAME} — Accès sécurisé</div>
         </div>
         <div className="wrapper">
           <div className="card">
             <h1>Accès non autorisé</h1>
-            <button onClick={logout}>Se déconnecter</button>
+            <button className="btn" onClick={logout}>
+              Se déconnecter
+            </button>
           </div>
         </div>
       </>
@@ -274,14 +320,16 @@ export default function RootApp() {
     const donorTrim = donor.trim();
     const emailTrim = email.trim();
     const forcedByEmail = SIGNER_BY_EMAIL[normalizeEmail(user?.email)];
-    const signerTrim = forcedByEmail || signerName.trim();
+    const signerTrim =
+      forcedByEmail && SIGNATURE_OPTIONS.includes(forcedByEmail)
+        ? forcedByEmail
+        : signerName.trim();
 
-    if (!donorTrim || !amount) return alert("Merci de remplir le nom du donateur et le montant");
+    if (!donorTrim || !amount) return alert("Nom et montant requis");
     if (emailTrim && !isValidEmail(emailTrim)) return alert("Email invalide");
 
     const amountNumber = Number(amount);
     if (isNaN(amountNumber) || amountNumber <= 0) return alert("Montant invalide");
-    if (!donationDate) return alert("Merci de choisir une date");
 
     setLoading(true);
     try {
@@ -297,35 +345,89 @@ export default function RootApp() {
         return next;
       });
 
-      // --- PDF ---
+      // --- PDF (style administratif) ---
       const pdf = new jsPDF();
+      const pageW = pdf.internal.pageSize.getWidth();
+      const margin = 15;
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(16);
+      pdf.text(ASSOCIATION_NAME, pageW / 2, 22, { align: "center" });
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(11);
+      pdf.text(ASSOCIATION_ADDRESS, pageW / 2, 29, { align: "center" });
+      pdf.text(`Objet : ${ASSOCIATION_OBJECT}`, pageW / 2, 35, { align: "center" });
+      pdf.setLineWidth(0.4);
+      pdf.line(margin, 40, pageW - margin, 40);
+      pdf.setFont("helvetica", "bold");
       pdf.setFontSize(14);
-      pdf.text(ASSOCIATION_NAME, 20, 26);
+      pdf.text(`REÇU DE DON N° ${number}`, pageW / 2, 52, { align: "center" });
+      pdf.line(margin, 56, pageW - margin, 56);
+
+      pdf.setFont("helvetica", "normal");
       pdf.setFontSize(12);
-      pdf.text(ASSOCIATION_ADDRESS, 20, 34);
-      pdf.text(`Objet de l'association : ${ASSOCIATION_OBJECT}`, 20, 46);
-      pdf.text(`Reçu N°: ${number}`, 160, 14);
-      pdf.text(`Donateur : ${donorTrim}`, 20, 70);
-      pdf.text(`Montant : ${amountNumber.toFixed(2)} €`, 20, 80);
-      pdf.text(`Date du don : ${formatDateFR(donationDate)}`, 20, 90);
-      pdf.text(`Mode de paiement : ${paymentLabel(paymentMethod)}`, 20, 100);
-      pdf.text(DON_PURPOSE, 20, 115);
-      pdf.text(`Signataire : ${signerTrim}`, 20, 130);
+      let y = 70;
+      const lh = 8;
+      pdf.text(`Donateur : ${donorTrim}`, margin, y);
+      y += lh;
+      pdf.text(`Montant  : ${amountNumber.toFixed(2)} €`, margin, y);
+      y += lh;
+      pdf.text(`Date du don : ${formatDateFR(donationDate)}`, margin, y);
+      y += lh;
+      pdf.text(`Mode de paiement : ${paymentLabel(paymentMethod)}`, margin, y);
+      y += lh + 5;
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Utilisation prévue du don :", margin, y);
+      y += lh;
+      pdf.setFont("helvetica", "normal");
+      const lines = pdf.splitTextToSize(DON_PURPOSE, pageW - margin * 2);
+      pdf.text(lines, margin, y);
+      y += lines.length * 6 + 10;
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Signataire :", margin, y);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(signerTrim, margin + 30, y);
+      y += 20;
+      pdf.setDrawColor(150);
+      pdf.line(margin, y, pageW - margin, y);
+      pdf.setFontSize(10);
+      pdf.setTextColor(80);
+      pdf.text("Merci pour votre soutien à l’Association MIM.", pageW / 2, y + 8, {
+        align: "center",
+      });
+      pdf.setTextColor(0);
 
       const pdfBlob = pdf.output("blob");
       const fileName = `receipt_${number}.pdf`;
-      const pdfBase64 = await blobToBase64(pdfBlob);
 
-      // --- Envoi mail ---
+      const storageRef = ref(storage, `receipts/${fileName}`);
+      const task = uploadBytesResumable(storageRef, pdfBlob);
+      await waitForUploadTask(task);
+      const fileUrl = await getDownloadURL(storageRef);
+
+      await setDoc(doc(db, "receipts", `receipt_${number}`), {
+        association: ASSOCIATION_NAME,
+        donor: donorTrim,
+        amount: amountNumber,
+        email: emailTrim || null,
+        number,
+        donationDate,
+        paymentMethod,
+        signerName: signerTrim,
+        fileUrl: fileUrl || null,
+        createdAt: serverTimestamp(),
+      });
+
+      const pdfBase64 = await blobToBase64(pdfBlob);
+      await sleep(200);
+
       const recipients = [];
       if (emailTrim) recipients.push(emailTrim);
-
       await addDoc(collection(db, "mail"), {
         to: recipients,
         bcc: [MAIL_ARCHIVE_BCC],
         from: MAIL_FROM,
         replyTo: MAIL_REPLY_TO,
-
         message: {
           subject: `Reçu ${ASSOCIATION_NAME} N°${number}`,
           text: `As-salāmu ‘alaykum wa rahmatullāh,
@@ -339,8 +441,7 @@ L’équipe de l’Association MIM`,
             <p><strong>As-salāmu ‘alaykum wa rahmatullāh,</strong></p>
             <p>Qu’Allāh accepte votre don et vous récompense pour votre générosité.</p>
             <p>Veuillez trouver en pièce jointe le reçu correspondant à votre contribution.</p>
-            <p><em>BarakAllāhu fīkum,</em><br/>
-            L’équipe de l’Association MIM</p>
+            <p><em>BarakAllāhu fīkum,</em><br/>L’équipe de l’Association MIM</p>
           `,
           attachments: [
             {
@@ -352,13 +453,13 @@ L’équipe de l’Association MIM`,
         },
       });
 
-      alert("✅ Reçu généré et envoyé avec la pièce jointe PDF.");
       setDonor("");
       setAmount("");
       setEmail("");
+      alert("✅ Reçu généré et envoyé avec la pièce jointe PDF.");
     } catch (e) {
-      console.error(e);
-      alert("❌ Erreur: " + e.message);
+      console.error("Erreur:", e);
+      alert("❌ Erreur : " + (e.message || e));
     } finally {
       setLoading(false);
     }
@@ -368,45 +469,35 @@ L’équipe de l’Association MIM`,
     <>
       <div className="brandbar">
         <div className="logo">M</div>
-        <div className="brandtitle">{ASSOCIATION_NAME}</div>
-      </div>
-
-      <div className="wrapper">
-        <div className="card">
-          <h1>Générer un reçu PDF</h1>
-          <div className="form">
-            <label>Nom du donateur</label>
-            <input value={donor} onChange={(e) => setDonor(e.target.value)} />
-
-            <label>Montant (€)</label>
-            <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
-
-            <label>Email du donateur</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-
-            <label>Date du don</label>
-            <input type="date" value={donationDate} onChange={(e) => setDonationDate(e.target.value)} />
-
-            <label>Mode de paiement</label>
-            <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-              <option value="Espece">Espèce</option>
-              <option value="CB">Carte bancaire (CB)</option>
-              <option value="Virement">Virement</option>
-            </select>
-
-            <label>Signataire</label>
-            <select value={signerName} onChange={(e) => setSignerName(e.target.value)} disabled={lockSigner}>
-              {SIGNATURE_OPTIONS.map((opt) => (
-                <option key={opt}>{opt}</option>
-              ))}
-            </select>
-
-            <button onClick={generateReceipt} disabled={loading}>
-              {loading ? "Traitement…" : "Générer le reçu"}
-            </button>
-          </div>
+        <div className="brandtitle">
+          {ASSOCIATION_NAME} — Reçus de dons (admin)
         </div>
       </div>
-    </>
-  );
-}
+      <div className="wrapper">
+        <div className="card">
+          <div className="header">
+            <h1>Générer un reçu PDF</h1>
+            <button className="btn" onClick={logout}>
+              Se déconnecter
+            </button>
+          </div>
+          <p className="subtitle">
+            Adresse : {ASSOCIATION_ADDRESS} • Objet : {ASSOCIATION_OBJECT}
+          </p>
+          <div className="form">
+            <div>
+              <label className="label">Nom du donateur</label>
+              <input
+                className="input"
+                value={donor}
+                onChange={(e) => setDonor(e.target.value)}
+              />
+            </div>
+            <div className="row">
+              <div>
+                <label className="label">Montant (€)</label>
+                <input
+                  className="input"
+                  type="number"
+                  value={amount}
+                  onChange={(
