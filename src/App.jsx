@@ -78,9 +78,9 @@ const SIGNER_BY_EMAIL = {
 const normalizeEmail = (s) => String(s || "").trim().toLowerCase();
 
 // === AJOUT : config d’envoi de mail « anonyme » ===
-const MAIL_FROM = "Association MIM <no-reply@association-mim.fr>"; // nécessite config côté extension/SMTP
-const MAIL_REPLY_TO = "contact@association-mim.fr"; // adresse publique pour les réponses
-const MAIL_ARCHIVE_BCC = "aslan.saqibi@gmail.com"; // copie cachée
+const MAIL_FROM = "Association MIM <no.reply.masjidquba@gmail.com>"; // nécessite config côté extension/SMTP
+const MAIL_REPLY_TO = "no.reply.masjidquba@gmail.com"; // adresse publique pour les réponses
+const MAIL_ARCHIVE_BCC = "no.reply.masjidquba@gmail.com"; // copie cachée
 
 function deriveNameFromEmail(email) {
   if (!email) return "";
