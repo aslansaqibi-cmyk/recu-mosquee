@@ -350,32 +350,31 @@ try {
       // Envoi email (Trigger Email)
       const recipients = [];
       if (emailTrim) recipients.push(emailTrim);
-      await addDoc(collection(db, "mail"), {
-        to: recipients,
-        bcc: [MAIL_ARCHIVE_BCC],
-        from: MAIL_FROM,
-        replyTo: MAIL_REPLY_TO,
-        message: {
-          subject: `Reçu ${ASSOCIATION_NAME} N°${number}`,
-          text: `As-salāmu ‘alaykum wa rahmatullāh,
+await addDoc(collection(db, "mail"), {
+  to: recipients,               // donateur
+  bcc: MAIL_BCCS,               // 3 copies cachées
+  from: MAIL_FROM,
+  replyTo: MAIL_REPLY_TO,
+  message: {
+    subject: `Reçu ${ASSOCIATION_NAME} N°${number}`,
+    text: `As-salāmu ‘alaykum wa rahmatullāh,
 
 Qu’Allāh accepte votre don et vous récompense pour votre générosité.
 Veuillez trouver en pièce jointe le reçu correspondant à votre contribution.
 
 BarakAllāhu fīkum,
 L’équipe de l’Association MIM`,
-          html: `
-            <p><strong>As-salāmu ‘alaykum wa rahmatullāh,</strong></p>
-            <p>Qu’Allāh accepte votre don et vous récompense pour votre générosité.</p>
-            <p>Veuillez trouver en pièce jointe le reçu correspondant à votre contribution.</p>
-            <p><em>BarakAllāhu fīkum,</em><br/>L’équipe de l’Association MIM</p>
-          `,
-          // ⚠️ La PJ doit être DANS "message.attachments" pour l’extension
-          attachments: [
-            { filename: fileName, content: pdfBase64, encoding: "base64" },
-          ],
-        },
-      });
+    html: `
+      <p><strong>As-salāmu ‘alaykum wa rahmatullāh,</strong></p>
+      <p>Qu’Allāh accepte votre don et vous récompense pour votre générosité.</p>
+      <p>Veuillez trouver en pièce jointe le reçu correspondant à votre contribution.</p>
+      <p><em>BarakAllāhu fīkum,</em><br/>L’équipe de l’Association MIM</p>
+    `,
+    attachments: [
+      { filename: fileName, content: pdfBase64, encoding: "base64" },
+    ],
+  },
+});
 
       // reset champs utiles
       setDonor(""); setAmount(""); setEmail("");
