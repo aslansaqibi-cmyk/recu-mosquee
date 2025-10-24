@@ -283,12 +283,6 @@ export default function RootApp() {
       pdf.text(`Date du don : ${formatDateFR(donationDate)}`, margin, y); y += lh;
       pdf.text(`Mode de paiement : ${paymentLabel(paymentMethod)}`, margin, y); y += lh;
 
-      // Utilisation
-      y += 5; pdf.setFont("helvetica", "bold"); pdf.text("Utilisation prévue du don :", margin, y);
-      y += lh; pdf.setFont("helvetica", "normal");
-      const lines = pdf.splitTextToSize(DON_PURPOSE, pageW - margin * 2);
-      pdf.text(lines, margin, y);
-      y += lines.length * 6 + 10;
 
       // Signataire
       pdf.setFont("helvetica", "bold"); pdf.text("Signataire :", margin, y);
@@ -304,6 +298,21 @@ export default function RootApp() {
       // Génération du PDF
       const pdfBlob = pdf.output("blob");
       const fileName = `receipt_${number}.pdf`;
+
+      // Téléchargement local
+try {
+  pdf.save(fileName);
+} catch {
+  // fallback mobile/iOS
+  const url = URL.createObjectURL(pdf.output("blob"));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
       // Upload + URL (archivage)
       let fileUrl = null;
