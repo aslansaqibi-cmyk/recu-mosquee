@@ -44,7 +44,7 @@ const db = getFirestore(app);
 const storage = getStorage(app, "gs://quba-21daf.firebasestorage.app");
 
 // ---------- HELPERS ----------
-const isValidEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s || "").trim());
+const isValidE = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s || "").trim());
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const waitForUploadTask = (task) =>
   new Promise((resolve, reject) => task.on("state_changed", undefined, reject, resolve));
@@ -82,7 +82,12 @@ const normalizeEmail = (s) => String(s || "").trim().toLowerCase();
 // Mail
 const MAIL_FROM = "Association MIM <no.reply.masjidquba@gmail.com>";
 const MAIL_REPLY_TO = "no.reply.masjidquba@gmail.com";
-const MAIL_ARCHIVE_BCC = "no.reply.masjidquba@gmail.com";
+const MAIL_BCCS = [
+  "no.reply.masjidquba@gmail.com",
+  "masjidquba95400@yahoo.fr",
+  "rajaman14@hotmail.com",
+];
+
 
 function formatDateFR(dateStr) {
   try {
