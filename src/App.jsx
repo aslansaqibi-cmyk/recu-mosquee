@@ -74,8 +74,8 @@ const SIGNATURE_OPTIONS = [
 ];
 
 const SIGNER_BY_EMAIL = {
-  "tariq@test.fr": "TRÉSORIER : RAJA TARIQ",
-  "asif@test.fr": "PRÉSIDENT : ALI ASIF",
+  "rajaman14@hotmail.com": "TRÉSORIER : RAJA TARIQ",
+  "masjidquba95400@yahoo.fr": "PRÉSIDENT : ALI ASIF",
 };
 const normalizeEmail = (s) => String(s || "").trim().toLowerCase();
 
